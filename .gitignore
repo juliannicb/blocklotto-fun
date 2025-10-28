@@ -21,3 +21,6 @@ frontend/.env.local
 npm-debug.log*
 pnpm-debug.log*
 yarn-error.log*
+
+# Local npm cache
+npm-cache/

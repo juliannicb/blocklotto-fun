@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { getClients, lottoAbi } from "@/hooks/useLottoContract";
-import { CONTRACT_ADDRESS } from "@/lib/constants";
+import { CONTRACT_ADDRESS, DEMO_MODE, HAS_ADDRESSES } from "@/lib/constants";
 
 export default function RoundStatus() {
   const [info, setInfo] = useState<any>(null);
@@ -8,6 +8,7 @@ export default function RoundStatus() {
 
   useEffect(() => {
     (async () => {
+      if (!HAS_ADDRESSES || DEMO_MODE || !CONTRACT_ADDRESS) return;
       const { publicClient } = getClients();
       const rid = await publicClient.readContract({ address: CONTRACT_ADDRESS as `0x${string}`, abi: lottoAbi, functionName: "currentRoundId" }) as bigint;
       setId(rid);
@@ -16,6 +17,15 @@ export default function RoundStatus() {
     })();
   }, []);
 
+  if (!HAS_ADDRESSES || DEMO_MODE || !CONTRACT_ADDRESS) {
+    return (
+      <div className="p-4 border rounded">
+        <h3>Round Status</h3>
+        <p>Demo mode: contract addresses not configured.</p>
+        <p>Set `NEXT_PUBLIC_CONTRACT_ADDRESS` and `NEXT_PUBLIC_USDC_ADDRESS` to enable live data.</p>
+      </div>
+    );
+  }
   if (!info || !id) return <div>Loading round…</div>;
   const [open, close, revealTime, winning, totalDeposits, carry1, drawn, settled] = info as any[];
   

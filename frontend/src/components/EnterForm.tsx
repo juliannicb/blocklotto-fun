@@ -11,14 +11,13 @@ import {
   useWriteContract,
 } from "wagmi";
 import { lottoAbi } from "@/hooks/useLottoContract";
-import { CONTRACT_ADDRESS } from "@/lib/constants";
-import { USDC_ADDRESS, ENTRY_USDC, USDC_DECIMALS } from "@/lib/constants";
-import { appChain, IS_LOCAL } from "@/lib/wagmi";
+import { CONTRACT_ADDRESS, USDC_ADDRESS, ENTRY_USDC, USDC_DECIMALS, DEMO_MODE, HAS_ADDRESSES } from "@/lib/constants";
+import { appChain, IS_LOCAL, RPC_URL } from "@/lib/wagmi";
 import { keccak256, encodePacked, encodeAbiParameters, toHex } from "viem";
 import { getClients } from "@/hooks/useLottoContract";
 
 // ---- Config ----
-const CHAIN_HEX = `0x${Number(process.env.NEXT_PUBLIC_CHAIN_ID!).toString(16)}`;
+const CHAIN_HEX = `0x${Number(appChain.id).toString(16)}`;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 type Entrant = { player: `0x${string}`; pick: number; txHash: `0x${string}` };
@@ -81,7 +80,7 @@ export default function EnterForm() {
                 chainId: CHAIN_HEX,
                 chainName: appChain.name,
                 nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
-                rpcUrls: [process.env.NEXT_PUBLIC_RPC_URL!],
+                rpcUrls: [RPC_URL],
                 blockExplorerUrls: appChain.blockExplorers?.default?.url ? [appChain.blockExplorers.default.url] : [],
               },
             ],
@@ -548,6 +547,21 @@ export default function EnterForm() {
   const formatTime = (timestamp: number) => {
     return new Date(timestamp * 1000).toLocaleString();
   };
+
+  const inDemo = !HAS_ADDRESSES || DEMO_MODE || !CONTRACT_ADDRESS || !USDC_ADDRESS;
+
+  if (inDemo) {
+    return (
+      <div className="p-4 border rounded">
+        <h3>Enter the Lotto</h3>
+        <p>Demo mode: contract addresses are not configured.</p>
+        <p>
+          Set `NEXT_PUBLIC_CONTRACT_ADDRESS` and `NEXT_PUBLIC_USDC_ADDRESS` to enable wallet
+          actions and on-chain reads.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 border rounded">

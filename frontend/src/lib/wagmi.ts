@@ -3,8 +3,12 @@ import { http, createConfig } from "wagmi";
 import { defineChain } from "viem";
 import { injected } from "wagmi/connectors";
 
-const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL!;
-const CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID!);
+// Provide safe defaults so builds don’t fail if env vars are missing
+const DEFAULT_RPC = "https://sepolia.base.org"; // public Base Sepolia RPC
+const DEFAULT_CHAIN_ID = 84532; // Base Sepolia chain id
+
+export const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL ?? DEFAULT_RPC;
+const CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? String(DEFAULT_CHAIN_ID));
 export const IS_LOCAL = CHAIN_ID === 31337;
 
 export const appChain = defineChain({

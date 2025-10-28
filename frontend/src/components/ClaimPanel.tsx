@@ -1,14 +1,17 @@
 import { getClients, lottoAbi } from "@/hooks/useLottoContract";
-import { CONTRACT_ADDRESS } from "@/lib/constants";
+import { CONTRACT_ADDRESS, DEMO_MODE, HAS_ADDRESSES } from "@/lib/constants";
 import { useEffect, useState } from "react";
 
 export default function ClaimPanel() {
-  const { publicClient, walletClient } = getClients();
+  // Avoid creating viem client during SSR render; initialize in effect
+  // Clients are only needed client-side for reading logs and contract state
   const [rid, setRid] = useState<bigint>(1n);
   const [roundInfo, setRoundInfo] = useState<any>(null);
   const [winners, setWinners] = useState<{ first: string[]; second: string[]; third: string[] }>({ first: [], second: [], third: [] });
 
   useEffect(() => { (async () => {
+    if (!HAS_ADDRESSES || DEMO_MODE || !CONTRACT_ADDRESS) return;
+    const { publicClient } = getClients();
     const id = await publicClient.readContract({ address: CONTRACT_ADDRESS as `0x${string}`, abi: lottoAbi, functionName: "currentRoundId" }) as bigint;
     setRid(id);
     
@@ -21,7 +24,7 @@ export default function ClaimPanel() {
     });
     setRoundInfo(info);
     // After settlement, derive winners from Entered logs
-    const [open, close, winning, totalDeposits, carry1, drawn, settled] = info as any[];
+    const [open, close, revealTime, winning, totalDeposits, carry1, drawn, settled] = info as any[];
     if (settled) {
       const enterEvent = (lottoAbi as any[]).find((x) => x.type === "event" && x.name === "Entered");
       if (enterEvent) {
@@ -58,13 +61,23 @@ export default function ClaimPanel() {
   };
 
   // Calculate prize amounts based on total deposits
-  const totalDeposits = roundInfo ? Number(roundInfo[3]) / 1e6 : 0;
+  const totalDeposits = roundInfo ? Number(roundInfo[4]) / 1e6 : 0;
   const firstPrize = totalDeposits * 0.7;
   const secondPrize = totalDeposits * 0.15;
   const thirdPrize = totalDeposits * 0.05;
-  const settled = roundInfo ? Boolean(roundInfo[6]) : false;
-  const winningNum = roundInfo ? Number(roundInfo[2]) : null;
+  const settled = roundInfo ? Boolean(roundInfo[7]) : false;
+  const winningNum = roundInfo ? Number(roundInfo[3]) : null;
 
+  if (!HAS_ADDRESSES || DEMO_MODE || !CONTRACT_ADDRESS) {
+    return (
+      <div>
+        <h3>Claim Winnings</h3>
+        <div className="muted" style={{ marginTop: 8 }}>
+          Demo mode: contract addresses not configured. Claims disabled.
+        </div>
+      </div>
+    );
+  }
   return (
     <div>
       <h3>

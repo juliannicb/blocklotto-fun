@@ -27,7 +27,8 @@ async function main() {
   const now = Math.floor(Date.now() / 1000);
   const open = now;
   const close = now + 24 * 60 * 60;
-  const tx2 = await lotto.createRound(open, close);
+  const reveal = close + 4 * 60 * 60; // 4 hours reveal phase
+  const tx2 = await lotto.createRound(open, close, reveal);
   await tx2.wait();
   console.log("Round #", (await lotto.currentRoundId()).toString(), "created");
 }

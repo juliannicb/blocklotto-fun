@@ -4,7 +4,9 @@ import { appChain } from "@/lib/wagmi";
 // Use the central BlockLotto ABI that includes commit/reveal functions
 import abi from "@/lib/BlockLotto.json"; // ensure tsconfig enables resolveJsonModule
 
-const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || undefined;
+// Safe default to avoid crashing on server builds if env is missing
+const DEFAULT_RPC = "https://sepolia.base.org";
+const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL ?? DEFAULT_RPC;
 
 /** Typed ABI used across the app */
 export const lottoAbi = abi as Abi;
