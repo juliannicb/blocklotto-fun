@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "strict": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "types": [
+      "node",
+      "hardhat"          // ✅ keep this
+    ]
+  },
+  "include": [
+    "hardhat.config.ts",
+    "scripts",
+    "test",
+    "typechain-types"
+  ]
+}
