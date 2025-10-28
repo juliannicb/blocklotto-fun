@@ -1,0 +1,9 @@
+{
+  "version": 2,
+  "builds": [
+    { "src": "frontend/next.config.js", "use": "@vercel/next" }
+  ],
+  "env": {
+    // Env vars are managed in Vercel UI; this file only enforces build target.
+  }
+}
