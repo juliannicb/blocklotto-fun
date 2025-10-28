@@ -15,6 +15,18 @@ import { CONTRACT_ADDRESS, USDC_ADDRESS, ENTRY_USDC, USDC_DECIMALS, DEMO_MODE, H
 import { appChain, IS_LOCAL, RPC_URL } from "@/lib/wagmi";
 import { keccak256, encodePacked, encodeAbiParameters, toHex } from "viem";
 import { getClients } from "@/hooks/useLottoContract";
+import {
+  initDemoRound,
+  getDemoAddress,
+  setDemoAddress,
+  getCurrentRoundId as demoCurrentRoundId,
+  getRound as demoGetRound,
+  getCommitments as demoGetCommitments,
+  getReveals as demoGetReveals,
+  getMyCommits as demoGetMyCommits,
+  commitPick as demoCommitPick,
+  revealPick as demoRevealPick,
+} from "@/lib/demo";
 
 // ---- Config ----
 const CHAIN_HEX = `0x${Number(appChain.id).toString(16)}`;
@@ -551,14 +563,204 @@ export default function EnterForm() {
   const inDemo = !HAS_ADDRESSES || DEMO_MODE || !CONTRACT_ADDRESS || !USDC_ADDRESS;
 
   if (inDemo) {
+    // Fully interactive demo using local storage
+    const demoAddr = getDemoAddress();
+    const connectDemo = () => {
+      const addr = setDemoAddress();
+      alert(`Connected demo wallet: ${addr}`);
+      // Refresh local UI state by forcing an update via state changes
+      setRoundId(BigInt(demoCurrentRoundId()));
+    };
+    const disconnectDemo = () => {
+      setDemoAddress("");
+      alert("Disconnected demo wallet");
+    };
+
+    // Initialize round and load local data
+    initDemoRound();
+    const dRound = demoGetRound(Number(roundId));
+    const phaseNow = (() => {
+      const now = Math.floor(Date.now() / 1000);
+      if (now < dRound.openTime || now >= dRound.revealTime) return "closed";
+      if (now >= dRound.openTime && now < dRound.closeTime) return "commit";
+      return "reveal";
+    })();
+
+    const loadDemoData = () => {
+      const c = demoGetCommitments(Number(roundId));
+      setCommitments(c.map((x) => ({ player: x.player as `0x${string}`, commitment: x.commitment, txHash: x.txHash as `0x${string}` })));
+      const r = demoGetReveals(Number(roundId));
+      setEntrants(r.map((x) => ({ player: x.player as `0x${string}`, pick: x.pick, txHash: x.txHash as `0x${string}` })));
+      if (demoAddr) {
+        const mine = demoGetMyCommits(Number(roundId), demoAddr);
+        const storedCommits = JSON.parse(localStorage.getItem(`commits_${roundId}_${demoAddr}`) || '[]');
+        const data: UserCommit[] = mine.map((m, idx) => {
+          const stored = storedCommits.find((s: any) => s.commitment === m.commitment);
+          return {
+            pick: stored ? stored.pick : -1,
+            nonce: stored ? stored.nonce : "",
+            commitment: m.commitment,
+            revealed: m.revealed,
+            commitIndex: idx,
+          };
+        });
+        setUserCommits(data);
+      }
+    };
+
+    useEffect(() => {
+      loadDemoData();
+      const id = setInterval(() => loadDemoData(), 1000);
+      return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [demoAddr, roundId]);
+
+    const submitDemoCommit = async () => {
+      if (!demoAddr) {
+        alert("Connect demo wallet");
+        return;
+      }
+      if (pick < 0 || pick > 999 || Number.isNaN(pick)) {
+        alert("Pick must be between 0 and 999");
+        return;
+      }
+      const autoNonce = () => Math.floor(Math.random() * 1000000000).toString();
+      const nonceToUse = (nonce && nonce.trim() !== "") ? nonce : autoNonce();
+      if (!nonce || nonce.trim() === "") setNonce(nonceToUse);
+      const commitment = generateCommitment(pick, nonceToUse);
+      const tx = demoCommitPick(Number(roundId), demoAddr, commitment);
+
+      const storedCommits = JSON.parse(localStorage.getItem(`commits_${roundId}_${demoAddr}`) || '[]');
+      storedCommits.push({ pick, nonce: nonceToUse, commitment });
+      localStorage.setItem(`commits_${roundId}_${demoAddr}`, JSON.stringify(storedCommits));
+
+      alert(`Commitment submitted (demo). tx: ${tx.slice(0,10)}...`);
+      loadDemoData();
+    };
+
+    const submitDemoReveal = async (commitData: UserCommit) => {
+      if (!demoAddr) {
+        alert("Connect demo wallet");
+        return;
+      }
+      if (commitData.pick === -1) {
+        alert("Pick data not found. Make sure you committed from this browser.");
+        return;
+      }
+      const tx = demoRevealPick(Number(roundId), demoAddr, Number(commitData.pick), commitData.nonce, commitData.commitIndex);
+      alert(`Pick revealed (demo). tx: ${tx.slice(0,10)}...`);
+      loadDemoData();
+    };
+
     return (
       <div className="p-4 border rounded">
-        <h3>Enter the Lotto</h3>
-        <p>Demo mode: contract addresses are not configured.</p>
-        <p>
-          Set `NEXT_PUBLIC_CONTRACT_ADDRESS` and `NEXT_PUBLIC_USDC_ADDRESS` to enable wallet
-          actions and on-chain reads.
-        </p>
+        <h3>Enter Round #{roundId.toString()} (Demo)</h3>
+
+        {/* Connection */}
+        {!demoAddr ? (
+          <div style={{ marginBottom: 12 }}>
+            <button onClick={connectDemo} className="button" style={{ marginRight: 8 }}>Connect Demo Wallet</button>
+          </div>
+        ) : (
+          <div style={{ marginBottom: 12 }}>
+            <span style={{ marginRight: 8 }}>{demoAddr}</span>
+            <button onClick={disconnectDemo} className="button">Disconnect</button>
+          </div>
+        )}
+
+        {/* Phase */}
+        <div className="muted" style={{ marginBottom: 8 }}>
+          Phase: {phaseNow === 'commit' ? 'Commit' : phaseNow === 'reveal' ? 'Reveal' : 'Closed'}
+        </div>
+
+        {/* Entry form */}
+        <div>
+          <label>
+            Pick (0-999)
+            <input type="number" min={0} max={999} value={pick} onChange={(e) => setPick(Number(e.target.value))} style={{ marginLeft: 8 }} />
+          </label>
+        </div>
+        <div style={{ marginTop: 8 }}>
+          <label>
+            Nonce
+            <input type="text" value={nonce} onChange={(e) => setNonce(e.target.value)} placeholder="random if empty" style={{ marginLeft: 8 }} />
+          </label>
+          <button onClick={generateNonce} className="button" style={{ marginLeft: 8 }}>Random</button>
+        </div>
+
+        <div style={{ marginTop: 12 }}>
+          <button onClick={submitDemoCommit} className="button cta" disabled={phaseNow !== 'commit'}>
+            Commit (Demo)
+          </button>
+          {phaseNow !== 'commit' && (
+            <span className="muted" style={{ marginLeft: 8 }}>Wait for commit window</span>
+          )}
+        </div>
+
+        {/* My commits */}
+        <div style={{ marginTop: 16 }}>
+          <h4>My Commits</h4>
+          {userCommits.length === 0 ? (
+            <div>No commits yet.</div>
+          ) : (
+            <div style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid #e0e0e0', borderRadius: '4px', padding: '8px', marginTop: 8 }}>
+              <ul style={{ margin: 0, paddingLeft: '16px' }}>
+                {userCommits.map((commit, i) => (
+                  <li key={i} style={{ marginBottom: 6 }}>
+                    <div><strong>Commitment:</strong> {commit.commitment.slice(0, 10)}...</div>
+                    {commit.pick !== -1 ? (
+                      <div><strong>Pick:</strong> {commit.pick}</div>
+                    ) : (
+                      <div style={{ color: 'red' }}>Pick data not found (committed from different browser?)</div>
+                    )}
+                    <div><strong>Status:</strong> {commit.revealed ? 'Revealed' : 'Not Revealed'}</div>
+                    {!commit.revealed && commit.pick !== -1 && (
+                      <button onClick={() => submitDemoReveal(commit)} className="button" style={{ marginTop: 6 }} disabled={phaseNow !== 'reveal'}>
+                        Reveal (Demo)
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+
+        {/* Commitments list */}
+        <div style={{ marginTop: 24 }}>
+          <h4>Commitments (Round #{roundId.toString()})</h4>
+          {commitments.length === 0 ? (
+            <div>No commitments yet.</div>
+          ) : (
+            <div style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid #e0e0e0', borderRadius: '4px', padding: '8px', marginTop: 8 }}>
+              <ul style={{ margin: 0, paddingLeft: '16px' }}>
+                {commitments.map((c, i) => (
+                  <li key={c.txHash + i} style={{ marginBottom: 4 }}>
+                    <code>{c.player}</code> — commitment <strong>{c.commitment.slice(0, 10)}...</strong>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+
+        {/* Revealed Entrants list */}
+        <div style={{ marginTop: 24 }}>
+          <h4>Revealed Picks (Round #{roundId.toString()})</h4>
+          {entrants.length === 0 ? (
+            <div>No picks revealed yet.</div>
+          ) : (
+            <div style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid #e0e0e0', borderRadius: '4px', padding: '8px', marginTop: 8 }}>
+              <ul style={{ margin: 0, paddingLeft: '16px' }}>
+                {entrants.map((e, i) => (
+                  <li key={e.txHash + i} style={{ marginBottom: 4 }}>
+                    <code>{e.player}</code> — pick <strong>{e.pick}</strong>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
       </div>
     );
   }

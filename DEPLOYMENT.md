@@ -57,7 +57,7 @@ For Vercel, add these env vars in Project Settings (Production & Preview), then 
 
 ### Demo Mode on Vercel
 
-You can deploy the frontend without live contracts using demo mode.
+You can deploy the frontend without live contracts using demo mode — the app will be fully interactive using an in-browser mock store.
 
 - Use `frontend/.env.demo` as a template. Either:
   - Copy locally: `cp frontend/.env.demo frontend/.env.local` and run `pnpm -C frontend dev`.
@@ -67,7 +67,14 @@ You can deploy the frontend without live contracts using demo mode.
     - `NEXT_PUBLIC_RPC_URL=https://sepolia.base.org`
     - Leave `NEXT_PUBLIC_CONTRACT_ADDRESS` and `NEXT_PUBLIC_USDC_ADDRESS` empty.
 
-In demo mode, the UI renders and clearly indicates that on-chain actions are disabled until addresses are provided.
+What works in demo mode:
+- Connect a “Demo Wallet” (no blockchain required)
+- Commit picks during the commit window (2 minutes)
+- Reveal picks during the reveal window (2 minutes)
+- Auto draw and settle after reveal closes (random winning number)
+- See commitments, revealed entrants, winners, and prize amounts
+
+All state is stored in `localStorage` per browser/tab, so it is ephemeral and isolated for each visitor.
 
 ## 6) Post-deploy operations
 - To create additional rounds:

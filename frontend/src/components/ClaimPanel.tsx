@@ -1,5 +1,6 @@
 import { getClients, lottoAbi } from "@/hooks/useLottoContract";
 import { CONTRACT_ADDRESS, DEMO_MODE, HAS_ADDRESSES } from "@/lib/constants";
+import { initDemoRound, getCurrentRoundId as demoCurrentRoundId, getRound as demoGetRound, getWinners as demoGetWinners, getPrizes as demoGetPrizes } from "@/lib/demo";
 import { useEffect, useState } from "react";
 
 export default function ClaimPanel() {
@@ -69,11 +70,43 @@ export default function ClaimPanel() {
   const winningNum = roundInfo ? Number(roundInfo[3]) : null;
 
   if (!HAS_ADDRESSES || DEMO_MODE || !CONTRACT_ADDRESS) {
+    initDemoRound();
+    const rid = demoCurrentRoundId();
+    const r = demoGetRound(rid);
+    const winners = demoGetWinners(rid);
+    const prizes = demoGetPrizes(rid);
+    const settled = r.settled;
+    const winningNum = r.winning;
     return (
       <div>
-        <h3>Claim Winnings</h3>
+        <h3>
+          Claim Winnings
+          {settled && winningNum !== null ? (
+            <span className="muted" style={{ marginLeft: 8 }}>Winning: {winningNum}</span>
+          ) : null}
+        </h3>
+        <div className="winner-display">
+          <div className="winner-line">
+            <span className="winner-place">1st</span>
+            <span className="winner-address">{settled && winners.first.length ? ` - ${winners.first[0]}` : ""}</span>
+            <span className="winner-amount">{` - ${prizes.first.toFixed(2)} USDC`}</span>
+          </div>
+          <div className="winner-line">
+            <span className="winner-place">2nd</span>
+            <span className="winner-address">{settled && winners.second.length ? ` - ${winners.second[0]}` : ""}</span>
+            <span className="winner-amount">{` - ${prizes.second.toFixed(2)} USDC`}</span>
+          </div>
+          <div className="winner-line">
+            <span className="winner-place">3rd</span>
+            <span className="winner-address">{settled && winners.third.length ? ` - ${winners.third[0]}` : ""}</span>
+            <span className="winner-amount">{` - ${prizes.third.toFixed(2)} USDC`}</span>
+          </div>
+        </div>
         <div className="muted" style={{ marginTop: 8 }}>
-          Demo mode: contract addresses not configured. Claims disabled.
+          Demo payouts simulated — winnings are shown here after settlement.
+        </div>
+        <div style={{ marginTop: 8 }}>
+          <a href="/rules" className="button cta claim-button" style={{ display: 'block', textAlign: 'center' }}>Rules</a>
         </div>
       </div>
     );
