@@ -51,9 +51,25 @@ NEXT_PUBLIC_RPC_URL=https://sepolia.base.org
 NEXT_PUBLIC_CHAIN_ID=84532
 NEXT_PUBLIC_CONTRACT_ADDRESS=0x<blocklotto-address>
 NEXT_PUBLIC_USDC_ADDRESS=0x<usdc-or-mock-address>
+NEXT_PUBLIC_DEMO_MODE=false
 ```
 
 For Vercel, add these env vars in Project Settings (Production & Preview), then redeploy.
+
+### Vercel Project Settings (Live Mode)
+- Root Directory: `frontend`
+- Framework Preset: Next.js
+- Build Command: `npm run build`
+- Environment Variables (Production & Preview):
+  - `NEXT_PUBLIC_DEMO_MODE=false`
+  - `NEXT_PUBLIC_CHAIN_ID=84532`
+  - `NEXT_PUBLIC_RPC_URL=https://sepolia.base.org`
+  - `NEXT_PUBLIC_CONTRACT_ADDRESS=0x<blocklotto-address>`
+  - `NEXT_PUBLIC_USDC_ADDRESS=0x<usdc-or-mock-address>`
+
+Important:
+- Ensure `frontend/.env.local` is not used in Vercel (it’s ignored by .gitignore and should remain empty in the cloud). If you previously committed a local env, remove it from Git and redeploy.
+- After changing envs, click “Redeploy” → “Clear build cache and redeploy” to guarantee the latest bundle is served.
 
 ### Demo Mode on Vercel
 
